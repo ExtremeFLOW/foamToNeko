@@ -31,66 +31,115 @@ Description
 
 \*---------------------------------------------------------------------------*/
 
-#include "fvCFD.H"
-#include "hexCell.H"
+#include "Time.H"
+#include "fvMesh.H"
+#include "columnFvMesh.H"
+#include "OSspecific.H"
+#include "argList.H"
+#include "timeSelector.H"
+#include "cyclicPolyPatch.H"
+ 
+using namespace Foam;
+
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <algorithm>
+#include "nekoMesh.H"
 
-class NekoVertex
-{
-    public:
-
-    int id;
-    double x;
-    double y;
-    double z;
-   
-
-    NekoVertex(int idv, double xv, double yv, double zv)
-    {
-        id = idv; x = xv; y = yv; z = zv;
-    }
-};
-
-class NekoHex
-{
-    public:
-
-    int id;
-    std::vector<NekoVertex> vertices;
-
-
-    NekoHex(int idv, std::vector<NekoVertex> v)
-    {
-       id = idv; vertices = v;
-
-    }
-
-    void write(std::ofstream & fs)
-    {
-        fs.write(reinterpret_cast<const char*>(&id), sizeof id);
-        
-        for(auto & vi : vertices)
-        {
-            fs.write(reinterpret_cast<const char*>(&vi.id), sizeof vi.id);
-            fs.write(reinterpret_cast<const char*>(&vi.x), sizeof vi.x);
-            fs.write(reinterpret_cast<const char*>(&vi.y), sizeof vi.y);
-            fs.write(reinterpret_cast<const char*>(&vi.z), sizeof vi.z);
-        }
-    
-
-    }
-};
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Try to find a face face withing the element. Returns face index in the element or -1 on fail
+int find_hex_face(const NekoHex & element, const face & faceI, const pointField & points, bool debug=true)
+{
+    // Search each hex face
+    for (int f=1; f<=6; f++)
+    {
+        //Info << "Face " << f << nl;
+        std::vector<int> vind = element.face(f);
+
+        // How many points we found in the face
+        int found = 0;
+
+        for(int pi=0; pi<4; pi++)
+        {
+            //Info << pi << nl;
+            // One of the points was not found
+            if (found < pi)
+            {
+                break;
+            }
+
+            //Info << "Found: " << found << nl;
+            point pointI = points[faceI[pi]];
+            for(int vi=0; vi<4; vi++)
+            {
+                const NekoVertex & vertexI = element.vertices[vind[vi] - 1];
+
+                //vertexI.print();
+
+                scalar dist = Foam::sqrt(sqr(pointI[0] - vertexI.x) +
+                                         sqr(pointI[1] - vertexI.y) +
+                                         sqr(pointI[2] - vertexI.z)
+                                        );
+                // Found the point
+                if (dist < SMALL)
+                {
+                    found++;
+                    //Info << "Found!" << nl;
+                    break;
+                }
+                
+
+            }
+        }
+
+        if (found == 4)
+        {
+            if (debug)
+            {
+                Info<< "Found face" << nl;
+                Info<< "    " <<  element.vertices[vind[0] - 1].x << " "
+                    << element.vertices[vind[0] - 1].y << " "
+                    << element.vertices[vind[0] - 1].z
+                    << nl;
+                Info<< "    " <<  element.vertices[vind[1] - 1].x << " "
+                    << element.vertices[vind[1] - 1].y << " "
+                    << element.vertices[vind[1] - 1].z
+                    << nl;
+                Info<< "    " <<  element.vertices[vind[2] - 1].x << " "
+                    << element.vertices[vind[2] - 1].y << " "
+                    << element.vertices[vind[2] - 1].z
+                    << nl;
+                Info<< "    " <<  element.vertices[vind[3] - 1].x << " "
+                    << element.vertices[vind[3] - 1].y << " "
+                    << element.vertices[vind[3] - 1].z
+                    << nl;
+            }
+            return f;
+        }
+    }
+    return -1;
+}
+
+void print_face(const face & f, const pointField & p)
+{
+    Info << p[f[0]] << nl;
+    Info << p[f[1]] << nl;
+    Info << p[f[2]] << nl;
+    Info << p[f[3]] << nl;
+
+}
+
 
 int main(int argc, char *argv[])
 {
     #include "setRootCase.H"
     #include "createTime.H"
     #include "createMesh.H"
+
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
     
@@ -107,6 +156,8 @@ int main(int argc, char *argv[])
     fs.write(reinterpret_cast<const char*>(&gDim), sizeof gDim);
 
     std::vector<NekoHex> nekoMesh;
+
+    Info << "Processing mesh cells" << nl;
 
     int elementID = 1;
     for (auto & cell : cells)
@@ -142,13 +193,13 @@ int main(int argc, char *argv[])
         for (int i=0; i<4; i++)
         {
             const point p = points[faceMinZ[ind[i]]];
-            Info << p << nl;
+            //Info << p << nl;
             NekoVertices.push_back(NekoVertex(faceMinZ[ind[i]] + 1, p[0], p[1], p[2]));
         }
         for (int i=0; i<4; i++)
         {
             const point p = points[faceMaxZ[i]];
-            Info << p << nl;
+//            Info << p << nl;
             NekoVertices.push_back(NekoVertex(faceMaxZ[i] + 1, p[0], p[1], p[2]));
         }
 
@@ -158,7 +209,7 @@ int main(int argc, char *argv[])
 
     }
 
-    HashTable<int, int> hash(8*nCells);
+    HashTable<int, int> hash(nCells);
 
     int vertexID = 1;
 
@@ -183,12 +234,144 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Write the mesh
+    // Write the mesh elements
     for(auto & element : nekoMesh)
     {
         element.write(fs);
     }
 
+    Info << "Processing boundaries" << nl;
+
+
+    // Boundary zones
+    const fvBoundaryMesh& boundary = mesh.boundary();
+
+    // Write the number of zone faces
+    int nZones = faces.size() - mesh.faceNeighbour().size();
+    fs.write(reinterpret_cast<const char*>(&nZones), sizeof nZones);
+
+    Info << "Mesh has " << nZones << " boundary faces"  << nl;
+
+    // We only need to go through one of the cyclic patches in a pair
+    // to create the periodic zone. So here we will hold the ids of
+    // patches that are already taken care of by going through the neigbour
+    std::vector<int> processedCyclics;
+
+    for (auto & patch : boundary)
+    {
+
+        Info<< "Boundary " <<  patch.name() << nl;
+        const label patchID = boundary.findPatchID(patch.name());
+
+        // Add neighbour patch
+        if (patch.type() == "cyclic")
+        {
+            if (std::binary_search(processedCyclics.begin(), processedCyclics.end(), patchID))
+            {
+                Info<< "Has already been processed by periodic neighbour"<<nl;
+                continue;
+            }
+
+            const cyclicPolyPatch & cyclic =
+                dynamic_cast<const cyclicPolyPatch &>(patch.patch());
+
+            processedCyclics.push_back(cyclic.neighbPatchID());
+
+
+        }
+
+        //indices of cells that own the patch faces
+        const auto & faceCells = patch.faceCells();
+
+        // We now need to find each patch face as a face index in a NekoHex
+        for(int i=0; i<patch.size(); i++)
+        {
+
+            const NekoHex & element = nekoMesh[faceCells[i]];
+            face faceI = faces[i + patch.start()];
+
+            //print_face(faceI, points);
+
+            int faceIndex = find_hex_face(element, faceI, points);
+
+            // Face found
+            if (faceIndex > 0)
+            {
+
+
+                // Periodic boundaries need special treatment
+                if (patch.type() == "cyclic")
+                {
+                    const cyclicPolyPatch & cyclic =  dynamic_cast<const cyclicPolyPatch &>(patch.patch());
+                    const labelUList & nbrCells = cyclic.nbrCells();
+                    
+                    // Neighbour element index, 1-based
+                    int pE = nbrCells[i] + 1;
+
+                    face nbrFace = faces[i + cyclic.neighbPatch().start()];
+                    const NekoHex & nbrElement = nekoMesh[nbrCells[i]];
+
+                    Info << "nbr face" << " " << faceI << nl;
+                    //print_face(faceI, points);
+
+                    int faceIndexNbr = find_hex_face(nbrElement, nbrFace, points);
+                    Info << faceIndexNbr << nl;
+
+                    std::array<int, 4> globalIds = {0, 0, 0, 0};
+
+                    for(int ovi=0; ovi<4; ovi++)
+                    {
+                        const NekoVertex & oVert = element.vertices[element.face(faceIndex)[ovi]];
+                        oVert.print();
+
+
+                        for(int vi=0; vi<4; vi++)
+                        {
+                            const NekoVertex & nbrVert = nbrElement.vertices[nbrElement.face(faceIndexNbr)[vi]];
+
+                            //vertexI.print();
+
+                            scalar dist = Foam::sqrt(sqr(nbrVert.x - oVert.x) +
+                                                     sqr(nbrVert.y - oVert.y) +
+                                                     sqr(nbrVert.z - oVert.z)
+                                                    );
+                            // Found the point
+                            if (dist < SMALL)
+                            {
+                                Info << "Found!" << nl;
+                                nbrVert.print();
+
+                                // We take the minumum of the two ids
+                                // Note that since thesea are boundary points
+                                // no other elements will hold them
+                                globalIds[ovi] = std::min(oVert.id, nbrVert.id);
+
+                                break;
+                            }
+                            
+
+                        }
+                    }
+
+                    NekoZone zoneFace(faceCells[i] + 1, faceIndex, pE, faceIndexNbr, globalIds, 5);
+                    zoneFace.write(fs);
+
+                }
+                else
+                {
+                    std::array<int, 4> dummy = {0, 0, 0, 0};
+                    NekoZone zoneFace(faceCells[i] + 1, faceIndex, 0, patchID + 1, dummy, 7);
+                    zoneFace.write(fs);
+                }
+            }
+            else
+            {
+                FatalErrorIn("Could not find boundary face in the element.")
+                   << abort(FatalError);
+            }
+            
+        } // face loop
+    } // patch loop
 
 
 
@@ -203,3 +386,5 @@ int main(int argc, char *argv[])
 
 
 // ************************************************************************* //
+
+
