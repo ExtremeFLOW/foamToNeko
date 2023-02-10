@@ -1,0 +1,115 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+scale   0.025;
+
+vertices
+(
+//block 0
+    (-0.25 0.25 0)
+    (-0.707106 0.707106 0)
+    (0.707106 0.707106 0)
+    (0.25 0.25 0)
+    (-0.25 0.25 20)
+    (-0.707106 0.707106 20)
+    (0.707106 0.707106 20)
+    (0.25 0.25 20)
+//block 1
+    (0.25 -0.25 0)
+    (0.707106 -0.707106 0)
+    (0.25 -0.25 20)
+    (0.707106 -0.707106 20)
+//block 3
+    (-0.25 -0.25 0)
+    (-0.707106 -0.707106 0)
+    (-0.25 -0.25 20)
+    (-0.707106 -0.707106 20)
+);
+xcells 5;
+ycells 5;
+zcells 5;
+
+xcells1 5;
+ycells1 5;
+zcells1 5;
+
+stretch 0.25;
+    
+    
+    blocks
+(
+    /*block 0 */ hex (0 3 2 1 4 7 6 5 ) ($xcells $ycells $zcells) simpleGrading (1 $stretch 1)
+    /*block 1 */ hex (3 8 9 2 7 10 11 6) ($xcells $ycells $zcells) simpleGrading (1 $stretch 1)
+    /*block 2 */ hex (8 12 13 9 10 14 15 11) ($xcells $ycells $zcells) simpleGrading (1 $stretch 1)
+    /*block 3 */ hex (12 0 1 13 14 4 5 15) ($xcells $ycells $zcells) simpleGrading (1 $stretch 1)
+    /*block 4 */ hex (0 12 8 3 4 14 10 7) ($xcells1 $ycells1 $zcells1) simpleGrading (1 1 1)
+);
+
+edges
+(
+ arc 1 2 (0 1 0)
+ arc 5 6 (0 1 20)
+ arc 2 9 (1 0 0)
+ arc 6 11(1 0 20)
+ arc 9 13 (0 -1 0)
+ arc 11 15 (0 -1 20)
+ arc 1 13 (-1 0 0)
+ arc 5 15 (-1 0 20)
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces
+        (
+            (0 1 2 3)
+            (2 3 8 9)
+            (8 9 13 12)
+            (13 12 0 1)
+            (0 3 8 12)
+        );
+    }
+    pipe
+    {
+        type wall;
+        faces
+        (
+         (1 5 6 2)
+         (2 6 11 9)
+         (9 11 15 13)
+         (15 13 5 1)
+        );
+    }
+    outlet
+    {
+        type patch;
+        faces
+        (
+            (4 5 6 7)
+            (6 7 10 11)
+            (15 11 10 14)
+            (15 14 4 5)
+            (4 7 10 14)
+        );
+    }
+);
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

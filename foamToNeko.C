@@ -240,6 +240,7 @@ int main(int argc, char *argv[])
         element.write(fs);
     }
 
+
     Info << "Processing boundaries" << nl;
 
 
@@ -264,6 +265,7 @@ int main(int argc, char *argv[])
         const label patchID = boundary.findPatchID(patch.name());
 
         // Add neighbour patch
+/*
         if (patch.type() == "cyclic")
         {
             if (std::binary_search(processedCyclics.begin(), processedCyclics.end(), patchID))
@@ -279,6 +281,7 @@ int main(int argc, char *argv[])
 
 
         }
+*/
 
         //indices of cells that own the patch faces
         const auto & faceCells = patch.faceCells();
@@ -292,7 +295,7 @@ int main(int argc, char *argv[])
 
             //print_face(faceI, points);
 
-            int faceIndex = find_hex_face(element, faceI, points);
+            int faceIndex = find_hex_face(element, faceI, points, false);
 
             // Face found
             if (faceIndex > 0)
@@ -302,6 +305,7 @@ int main(int argc, char *argv[])
                 // Periodic boundaries need special treatment
                 if (patch.type() == "cyclic")
                 {
+
                     const cyclicPolyPatch & cyclic =  dynamic_cast<const cyclicPolyPatch &>(patch.patch());
                     const labelUList & nbrCells = cyclic.nbrCells();
                     
@@ -314,29 +318,32 @@ int main(int argc, char *argv[])
                     Info << "nbr face" << " " << faceI << nl;
                     //print_face(faceI, points);
 
-                    int faceIndexNbr = find_hex_face(nbrElement, nbrFace, points);
+                    int faceIndexNbr = find_hex_face(nbrElement, nbrFace, points, false);
                     Info << faceIndexNbr << nl;
 
                     std::array<int, 4> globalIds = {0, 0, 0, 0};
 
                     for(int ovi=0; ovi<4; ovi++)
                     {
-                        const NekoVertex & oVert = element.vertices[element.face(faceIndex)[ovi]];
+                        const NekoVertex & oVert = element.vertices[element.face(faceIndex)[ovi] - 1];
+                        Info <<"Original vertex" << nl;
                         oVert.print();
 
 
                         for(int vi=0; vi<4; vi++)
                         {
-                            const NekoVertex & nbrVert = nbrElement.vertices[nbrElement.face(faceIndexNbr)[vi]];
+                            const NekoVertex & nbrVert = nbrElement.vertices[nbrElement.face(faceIndexNbr)[vi] - 1];
 
-                            //vertexI.print();
+                            nbrVert.print();
 
-                            scalar dist = Foam::sqrt(sqr(nbrVert.x - oVert.x) +
-                                                     sqr(nbrVert.y - oVert.y) +
-                                                     sqr(nbrVert.z - oVert.z)
-                                                    );
-                            // Found the point
-                            if (dist < SMALL)
+                            scalar distx = mag(nbrVert.x - oVert.x);
+                            scalar disty = mag(nbrVert.y - oVert.y);
+                            scalar distz = mag(nbrVert.z - oVert.z);
+
+                            // Found the point if at least 2 distances are 0
+                            if ((distx < SMALL && disty < SMALL) ||
+                                (distx < SMALL && distz < SMALL) ||
+                                (disty < SMALL && distz < SMALL))
                             {
                                 Info << "Found!" << nl;
                                 nbrVert.print();
@@ -372,7 +379,6 @@ int main(int argc, char *argv[])
             
         } // face loop
     } // patch loop
-
 
 
 

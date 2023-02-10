@@ -1,0 +1,114 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2212                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+scale   1;
+
+pi #eval{ 4*atan(1.0) };
+
+vertices
+(
+    (-$pi -$pi -$pi)
+    ($pi -$pi -$pi)
+    ($pi $pi -$pi)
+    (-$pi $pi -$pi)
+    (-$pi -$pi $pi)
+    ($pi -$pi $pi)
+    ($pi $pi $pi)
+    (-$pi $pi $pi)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (8 8 8) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+boundary
+(
+    top
+    {
+        //type cyclic;
+        type wall;
+        neighbourPatch bottom;
+        separationVector (0 -1 0);
+        faces
+        (
+            (3 7 6 2)
+        );
+    }
+    bottom
+    {
+        //type cyclic;
+        type wall;
+        neighbourPatch top;
+        separationVector (0 1 0);
+        faces
+        (
+            (1 5 4 0)
+        );
+    }
+    right 
+    {
+        //type cyclic;
+        type wall;
+        neighbourPatch left;
+        separationVector (-1 0 0);
+        faces
+        (
+            (2 6 5 1)
+        );
+    }
+    left
+    {
+        //type cyclic;
+        type wall;
+        neighbourPatch right;
+        separationVector (1 0 0);
+        faces
+        (
+            (0 4 7 3)
+        );
+    }
+    front
+    {
+        //type cyclic;
+        type wall;
+        neighbourPatch back;
+        separationVector (0 0 -1);
+        faces
+        (
+            (0 3 2 1)
+        );
+    }
+    back
+    {
+        //type cyclic;
+        type wall;
+        neighbourPatch front;
+        separationVector (0 0 1);
+        faces
+        (
+            (4 5 6 7)
+        );
+    }
+);
+
+
+// ************************************************************************* //
+
